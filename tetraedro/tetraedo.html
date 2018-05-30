@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset=utf-8>
+		<title>My first three.js app</title>
+		<style>
+			body { margin: 0; }
+			canvas { width: 100%; height: 100% }
+		</style>
+	</head>
+	<body>
+		<script src="js/three.js"></script>
+		<script src="js/orbitControl.js"></script>
+		<script>
+			// 0xff0000 - vermelho
+			// 0xFFFF00 - amarelo
+			// 0x3D85C6 - azul
+			// 0xFF00FF - rosa
+			function criarTetraedro(cor1, cor2, cor3, cor4){
+				//--------------CRIANDO TETRAEDRO ----------------------------
+				//define a forma geometrica
+				var geometry = new THREE.Geometry();
+				//define a cor
+				var material = new THREE.MeshBasicMaterial( { vertexColors: THREE.FaceColors} );
+				var a = 2;
+				var alturaTriangulo = a * Math.sqrt(3)/2;
+				var alturaTetraedo = a * Math.sqrt(6)/3;
+				var trianguloCentro = alturaTriangulo/3;
+				var tetraedroCentro = alturaTetraedo/2;
+				//define os vertices do tetraedro
+				geometry.vertices.push(
+					new THREE.Vector3(0, alturaTetraedo/2, 0), //topo
+					new THREE.Vector3(-a/2, -alturaTetraedo/2, trianguloCentro), //esquerdo
+					new THREE.Vector3(a/2, -alturaTetraedo/2, trianguloCentro), //direito
+					new THREE.Vector3(0, -alturaTetraedo/2, -alturaTriangulo + trianguloCentro) //profundidade
+				);
+				
+				// cria as faces do tetraedro unindo os vértices definidos anteriormente com diferentes cores.
+				var face = new THREE.Face3( 1, 2, 0, null, new THREE.Color(cor1));
+				var face2 = new THREE.Face3( 0, 2, 3, null, new THREE.Color(cor2));
+				var face3 = new THREE.Face3(1,0,3, null, new THREE.Color(cor3));
+				var face4 = new THREE.Face3(2,1,3, null, new THREE.Color(cor4));
+				face.cor = "vermelho";
+				face2.cor = "amarelo";
+				face3.cor = "azul";
+				face4.cor = "rosa";
+				//une as faces
+				geometry.faces.push(face);
+				geometry.faces.push(face2);
+				geometry.faces.push(face3);
+				geometry.faces.push(face4);
+				
+				//une a forma geométrica com o material
+				geometry.computeBoundingSphere();
+				var tetraedro = new THREE.Mesh( geometry, material);
+				return tetraedro;
+			}
+			
+			function calcularEixo(tetraedro, corFace){
+				let faces = tetraedro.geometry.faces;
+				let vertices = tetraedro.geometry.vertices;
+				var indice;
+				
+				var faceSelecionada;
+				for (x in faces){
+					if (faces[x].cor == "amarelo"){
+						faceSelecionada = faces[x];
+						indice = x;
+						break;
+					} else if (faces[x].cor == "azul"){
+						faceSelecionada = faces[x];
+						indice = x;
+						break;
+					}
+				}
+				
+				let x1 = vertices[faceSelecionada.a].x;
+				let x2 = vertices[faceSelecionada.b].x;
+				let x3 = vertices[faceSelecionada.c].x;
+				
+				let y1 = vertices[faceSelecionada.a].y;
+				let y2 = vertices[faceSelecionada.b].y;
+				let y3 = vertices[faceSelecionada.c].y;
+				
+				let z1 = vertices[faceSelecionada.a].z;
+				let z2 = vertices[faceSelecionada.b].z;
+				let z3 = vertices[faceSelecionada.c].z;
+				
+				let baricentroX = (x1 + x2 + x3) / 3;
+				let baricentroY = (y1 + y2 + y3) / 3;
+				let baricentroZ = (z1 + z2 + z3) / 3;
+				
+				let baricentro = new THREE.Vector3(baricentroX, baricentroY, baricentroZ);
+				
+				let eixoRotacaoTopo = new THREE.Vector3();
+				let eixoRotacaoDireito = new THREE.Vector3();
+				let eixoRotacaoEsquerdo = new THREE.Vector3();
+				let eixoRotacaoZ = new THREE.Vector3();
+				
+				eixoRotacaoTopo.subVectors(vertices[2], baricentro).normalize();
+				eixoRotacaoDireito.subVectors(vertices[1], baricentro).normalize();
+				eixoRotacaoEsquerdo.subVectors(vertices[0], baricentro).normalize();
+				eixoRotacaoZ.subVectors(vertices[3], baricentro).normalize();
+				
+				/*let eixoRotacaoTopo = vertices[2].sub(baricentro).normalize();
+				let eixoRotacaoDireito = vertices[1].sub(baricentro).normalize();
+				let eixoRotacaoEsquerdo = vertices[0].sub(baricentro).normalize();
+				let eixoRotacaoZ = vertices[3].sub(baricentro).normalize();*/
+				
+				let eixosRotacao = {
+					eixoRotacaoTopo: eixoRotacaoTopo,
+					eixoRotacaoDireito: eixoRotacaoDireito,
+					eixoRotacaoEsquerdo: eixoRotacaoEsquerdo,
+					eixoRotacaoZ: eixoRotacaoZ
+				};
+				
+				tetraedro.eixosRotacao = eixosRotacao;
+				return tetraedro;
+			}
+			
+			var scene = new THREE.Scene();
+			var renderer = new THREE.WebGLRenderer();
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			document.body.appendChild( renderer.domElement );
+			
+			let aspect = window.innerWidth / window.innerHeight;
+			let frum = 10
+			
+			var camera = new THREE.OrthographicCamera( frum * aspect / -2, frum * aspect / 2, frum / 2, frum / -2, 1, 2000);
+			camera.position.z = 10;
+			
+			var tetraedro = criarTetraedro(0xff0000, 0xFFFF00, 0x3D85C6, 0xFF00FF);
+			
+			
+			var a = 2;
+			
+			var distancia = a //tamanho arestra
+			var alturaTriangulo = (a * Math.sqrt(3)/2);
+			var alturaTetraedo = a * Math.sqrt(6)/3;
+			var centroTriangulo = alturaTriangulo/3;
+			var centroTetraedro = alturaTetraedo/2;
+			
+			let vetorCentroTetradro = new THREE.Vector3();
+			let angulo = tetraedro.geometry.vertices[0].angleTo( tetraedro.geometry.vertices[1]);
+			
+			let tetraedro2 = tetraedro.clone();
+			let tetraedro3 = tetraedro.clone();
+			let tetraedro4 = tetraedro.clone();
+			let tetraedro5 = tetraedro.clone();
+			let tetraedro6 = tetraedro.clone();
+			let tetraedro7 = tetraedro.clone();
+			let tetraedro8 = tetraedro.clone();
+			let tetraedro9 = tetraedro.clone();
+			
+			let tetraedro10 = tetraedro.clone();
+			let tetraedro11 = tetraedro.clone();
+			let tetraedro12 = tetraedro.clone();
+			let tetraedro13 = tetraedro.clone();
+			let tetraedro14 = tetraedro.clone();
+			let tetraedro15 = tetraedro.clone();
+			
+			let tetraedro16 = tetraedro.clone();
+			let tetraedro17 = tetraedro.clone();
+			let tetraedro18 = tetraedro.clone();
+			let tetraedro19 = tetraedro.clone();
+			let tetraedro20 = tetraedro.clone();
+			let tetraedro21 = tetraedro.clone();
+			let tetraedro22 = tetraedro.clone();
+			
+			let tetraedosBase = [];
+			let tetraedosMeio = [];
+			let tetraedrosInclinacaoEsquerdoMeio = [];
+			let tetraedrosInclinacaoEsquerdoBase = [];
+			let tetraedrosInclinacaoDireitoMeio = [];
+			let tetraedrosInclinacaoDireitoBase = [];
+			tetraedosBase.push(tetraedro, tetraedro2, tetraedro3, tetraedro7, tetraedro8, tetraedro14, tetraedro15, tetraedro17, tetraedro18);
+			tetraedosMeio.push(tetraedro4, tetraedro5, tetraedro9, tetraedro10, tetraedro11, tetraedro13);
+			tetraedrosInclinacaoEsquerdoBase.push(tetraedro6, tetraedro9, tetraedro5, tetraedro8, tetraedro3);
+			tetraedrosInclinacaoEsquerdoMeio.push(tetraedro4, tetraedro7, tetraedro);
+			tetraedrosInclinacaoDireitoMeio.push(tetraedro5, tetraedro8, tetraedro);
+			tetraedrosInclinacaoDireitoBase.push(tetraedro6, tetraedro9, tetraedro4, tetraedro2, tetraedro7);
+			
+			// ---------------------------- VERMELHO --------------------
+			tetraedro2.translateX(-distancia); // base 1
+			tetraedro3.translateX(distancia); // base 5
+			
+			//base 2 pra baixo
+			tetraedro7.rotateX(2.46); 
+			tetraedro7.rotateY(Math.PI); 
+			tetraedro7.translateX(distancia/2);
+			tetraedro7.translateY(0.13);
+			tetraedro7.translateZ(-0.04);
+			
+			//base 4 para baixo
+			tetraedro8.rotateX(2.46);
+			tetraedro8.rotateY(Math.PI); 
+			tetraedro8.translateX(-distancia/2);
+			tetraedro8.translateY(0.13);
+			tetraedro8.translateZ(-0.04);
+			
+			//meio 1 para cima
+			tetraedro4.translateY(alturaTriangulo); 
+			tetraedro4.translateX(-distancia/2);
+			tetraedro4.translateZ(-centroTriangulo);
+			
+			//meio 3 para cima
+			tetraedro5.translateY(alturaTriangulo); 
+			tetraedro5.translateX(distancia/2); 
+			tetraedro5.translateZ(-centroTriangulo);
+			
+			//meio 2 para baixo
+			tetraedro9.rotateX(2.46);
+			tetraedro9.rotateY(Math.PI); 
+			tetraedro9.translateY(-alturaTriangulo + 0.18); 
+			tetraedro9.translateZ(centroTriangulo + 0.01);
+			
+			//topo
+			tetraedro6.translateY(2*alturaTriangulo - 0.06); 
+			tetraedro6.translateZ(-2*centroTriangulo); // topo
+		
+			// ---------------------------- ROSA --------------------
+			//meio 1 pra cima
+			tetraedro10.translateZ(-alturaTriangulo); 
+			tetraedro10.translateX(distancia/2);
+			
+			//meio 3 pra cima
+			tetraedro11.translateZ(-alturaTriangulo); 
+			tetraedro11.translateX(-distancia/2); 
+			
+			//meio 2 pra baixo
+			tetraedro13.rotateY(Math.PI); 
+			tetraedro13.translateZ(alturaTriangulo + 0.58);
+			
+			//topo
+			tetraedro12.translateZ(-2*alturaTriangulo);
+			
+			//base 4 pra baixo
+			tetraedro14.rotateY(Math.PI); 
+			tetraedro14.translateX(distancia/2); 
+			tetraedro14.translateZ(distancia/4 + 0.08);
+			
+			//base 2 pra baixo
+			tetraedro15.rotateY(Math.PI);
+			tetraedro15.translateX(-distancia/2); 
+			tetraedro15.translateZ(distancia/4 + 0.08);
+			
+			// ---------------------------- AZUL --------------------
+			
+			// meio 1 pra cima
+			tetraedro16.translateZ(-2*centroTetraedro -0.68);
+			tetraedro16.translateY(alturaTriangulo);
+			
+			//base 2 pra baixo
+			tetraedro17.rotateX(Math.PI);
+			tetraedro17.translateZ(3.179);
+			tetraedro17.translateX(-0.57);
+			tetraedro17.rotateY(1.08);
+			tetraedro17.rotateZ(0.57);
+			tetraedro17.rotateX(-0.33);
+			tetraedro17.translateZ(-0.27);
+			tetraedro17.translateX(0.57);1
+			tetraedro17.rotateY(0.06);
+			tetraedro17.rotateZ(0.03);
+			tetraedro17.rotateX(-0.01999);
+			
+			//base 3 pra baixotetraedro17.rotateX(Math.PI);
+			tetraedro18.rotateX(Math.PI);
+			tetraedro18.translateZ(3.189);
+			tetraedro18.translateX(-0.57);
+			tetraedro18.rotateY(1.08);
+			tetraedro18.rotateZ(0.57);
+			tetraedro18.rotateX(-0.33);
+			tetraedro18.translateZ(-0.27);
+			tetraedro18.translateX(0.57);
+			tetraedro18.rotateY(0.06);
+			tetraedro18.rotateZ(0.03);
+			tetraedro18.rotateX(-0.01999);
+			tetraedro18.translateZ(-1.71);
+			tetraedro18.translateX(0.92);
+			
+			//meio 2 pra baixo
+			tetraedro19.rotateX(Math.PI);
+			tetraedro19.translateY(-alturaTriangulo);
+			tetraedro19.translateY(0.24);
+			tetraedro19.translateZ(1.1600000000000008);
+			tetraedro19.rotateX(-0.26000000000000006);
+			tetraedro19.rotateY(1.1300000000000008);
+			tetraedro19.rotateZ(0.6500000000000004);
+			
+			//add o tetraedro na cena
+			scene.add(tetraedro);
+			scene.add(tetraedro2);
+			scene.add(tetraedro3);
+			scene.add(tetraedro4);
+			scene.add(tetraedro5);
+			scene.add(tetraedro6);
+			scene.add(tetraedro7);
+			scene.add(tetraedro8);
+			scene.add(tetraedro9);
+			
+			var animate = function () {
+				requestAnimationFrame( animate );
+				
+				//controls.update();
+				
+				renderer.render(scene, camera);
+			};
+
+			animate();
+			
+			// movement - please calibrate these values
+			var xSpeed = 0.1;
+			var ySpeed = 0.01;
+			let teste  = 0;
+			let teste2 = 0;
+			let teste3  = 0;
+			let teste4 = 0;
+			let teste5 = 0;
+			let teste6 = 0;
+			
+			document.addEventListener("keydown", onDocumentKeyDown, false);
+			function onDocumentKeyDown(event) {
+			    var keyCode = event.which;
+			    if (keyCode == 87) { //w
+		        	tetraedro19.translateZ(0.01);
+		        	teste +=0.01;
+			    } else if (keyCode == 83) { //s
+		        	tetraedro19.translateZ(-0.01);
+		        	teste-=0.01;
+			    } else if (keyCode == 65) { //a
+			    	tetraedro19.translateX(0.01);
+			    	teste2 += 0.01
+			    } else if (keyCode == 68) { //d
+			    	tetraedro19.translateX(-0.01);
+			    	teste2 -= 0.01;
+			    } else if (keyCode == 32) {
+			    	console.log("TranslateZ:" + teste);
+			    	console.log("translateX:" + teste2);
+			    	console.log("translateY:" + teste6);
+			    	console.log("rotateY:" + teste3);
+			    	console.log("rotateZ:" + teste4);
+			    	console.log("rotateX:" + teste5);
+			    } else if (keyCode == 100) { //4
+			    	tetraedro19.rotateY(0.01);
+			    	teste3 += 0.01
+			    } else if (keyCode == 102) { // 6
+			    	tetraedro19.rotateY(-0.01);
+			    	teste3 -= 0.01
+			    } else if (keyCode == 104) {//8
+			    	tetraedro19.rotateZ(+0.01);
+			    	teste4 += 0.01
+			    } else if (keyCode == 98) { //2
+			    	tetraedro19.rotateZ(-0.01);
+			    	teste4 -= 0.01
+			    } else if (keyCode == 103) { //7
+			    	tetraedro19.rotateX(+0.01);
+			    	teste5 += 0.01
+			    } else if (keyCode == 105) { //9
+			    	tetraedro19.rotateX(-0.01);
+			    	teste5 -= 0.01
+			    } else if (keyCode == 81) { //7
+			    	tetraedro19.translateY(+0.01);
+			    	teste6+= 0.01
+			    } else if (keyCode == 69) { //9
+			    	tetraedro19.translateY(-0.01);
+			    	teste6 -= 0.01
+			    } else if (keyCode == 49) {
+			    	tetraedro6.rotateY(2*Math.PI/3);
+			    } else if (keyCode == 50) {
+			    	tetraedosMeio.map((tetra) => {
+			    		tetra.rotateY(2*Math.PI/3);
+			    	});
+			    } else if (keyCode == 51) {
+			    	tetraedosBase.map((tetra) => {
+			    		tetra.rotateY(2*Math.PI/3);
+			    	});
+			    } else if (keyCode == 52) {
+			    	tetraedro2.rotateY(2*Math.PI/3);
+			    } else if (keyCode == 53) {
+			    	tetraedrosInclinacaoEsquerdoMeio.map((tetra) => {
+			    		tetra.rotateY(2*Math.PI/3);
+			    	});
+			    } else if (keyCode == 54) {
+			    	tetraedrosInclinacaoEsquerdoBase.map((tetra) =>{
+			    		tetra.rotateY(2*Math.PI/3);
+			    	});
+			    } else if (keyCode == 55) {
+			    	tetraedro3.rotateY(2*Math.PI/3);
+			    } else if (keyCode == 56) {
+			    	tetraedrosInclinacaoDireitoMeio.map((tetra) => {
+			    		tetra.rotateY(2*Math.PI/3);
+			    	});
+			    } else if (keyCode == 57) {
+			    	tetraedrosInclinacaoDireitoBase.map((tetra) => {
+			    		tetra.rotateY(2*Math.PI/3);
+			    	});
+			    }
+			};
+					</script>
+	</body>
+</html>
